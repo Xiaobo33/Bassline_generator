@@ -1,0 +1,51 @@
+# 推送到 main 时：跑测试 → 组装网站 → 发布到 GitHub Pages。
+# 网站是纯静态文件：index.html + bassline/*.py，乐谱由浏览器里的 Pyodide 运行 Python 生成。
+# 第一次使用前要在仓库 Settings → Pages → Source 选择 "GitHub Actions"。
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # 也可以在 Actions 页面手动运行
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run tests
+        run: |
+          pip install pytest
+          PYTHONPATH=src python -m pytest -q
+
+      - name: Build site
+        run: |
+          mkdir -p _site/bassline
+          cp web/index.html _site/
+          cp src/bassline/*.py _site/bassline/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
